@@ -19,6 +19,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
+import android.widget.Toast;
 
 import com.nostra13.universalimageloader.cache.disc.naming.Md5FileNameGenerator;
 import com.nostra13.universalimageloader.cache.memory.impl.LruMemoryCache;
@@ -42,6 +43,10 @@ public class MainActivity extends ActionBarActivity {
     Toolbar toolbar;
     ImageLoader imageLoader;
     SwipeRefreshLayout refreshLayout;
+    boolean isLoadingMore = false;
+    StaggeredGridLayoutManager mStaggeredGridLayoutManager;
+    boolean isEnd = false;
+    int rowCount = 3;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -54,6 +59,7 @@ public class MainActivity extends ActionBarActivity {
         DisplayImageOptions options = new DisplayImageOptions.Builder()
                 .showImageForEmptyUri(R.mipmap.ic_launcher)
                 .showImageOnFail(R.drawable.onlytrue)
+                .delayBeforeLoading(100)
                 .displayer(new RoundedBitmapDisplayer(5)).build();
 
 
@@ -71,7 +77,7 @@ public class MainActivity extends ActionBarActivity {
         // in content do not change the layout size of the RecyclerView
         recyclerView.setHasFixedSize(true);
 
-        StaggeredGridLayoutManager mStaggeredGridLayoutManager = new StaggeredGridLayoutManager(3, StaggeredGridLayoutManager.VERTICAL);//表示两列，并且是竖直方向的瀑布流
+        mStaggeredGridLayoutManager = new StaggeredGridLayoutManager(rowCount, StaggeredGridLayoutManager.VERTICAL);//表示两列，并且是竖直方向的瀑布流
         recyclerView.setLayoutManager(mStaggeredGridLayoutManager);
 
 
@@ -79,23 +85,53 @@ public class MainActivity extends ActionBarActivity {
         recycleAdapter = new RecycleAdapter(this);
         recyclerView.setAdapter(recycleAdapter);
 
-        refreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+        refreshLayout.setOnTouchListener(null);
+        recyclerView.setOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
-            public void onRefresh() {
-                if(googleSearchResult!=null){
-                    int curIndex = googleSearchResult.getResponseData().getCursor().getCurrentPageIndex();
-                    List<GoogleSearchResult.ResponseData.Cursor.Pages> pagers=googleSearchResult.getResponseData().getCursor().getPagers();
-                    curIndex++;
-                    if(pagers!=null&&curIndex<pagers.size()){
+            public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
+                super.onScrolled(recyclerView, dx, dy);
+                if(isEnd)
+                    return;
+                int[] lastVisibleItemArray = mStaggeredGridLayoutManager.findLastVisibleItemPositions(null);
+                int  lastVisibleItem = 0;
+                for (int i :lastVisibleItemArray){
+                    lastVisibleItem = Math.max(lastVisibleItem,i);
+                }
+                int totalItemCount = recyclerView.getLayoutManager().getItemCount();
+                Log.d("googleSearch", "lastVisibleItem :" + lastVisibleItem);
+                Log.d("googleSearch", "dy :" + dy);
 
-                         new GoogleSearch(MainActivity.this,searchCallBack).execute(curKey,
-                                googleSearchResult.getResponseData().getCursor().getPagers().get(curIndex).getStart());
-                    }else{
+                Log.d("googleSearch", "totalItemCount :" + totalItemCount);
+                boolean  isNotFull = recyclerView.getHeight() >= mStaggeredGridLayoutManager.getHeight();
+                //lastVisibleItem >= totalItemCount - 4 表示剩下4个item自动加载，各位自由选择
+                // dy>0 表示向下滑动
+                if (lastVisibleItem >= totalItemCount - rowCount&& (dy > 0||isNotFull)) {
+                    if(isLoadingMore){
+                        //Log.d(TAG,"ignore manually update!");
+                    } else{
+                        if(googleSearchResult!=null){
+                            int curIndex = googleSearchResult.getResponseData().getCursor().getCurrentPageIndex();
+                            List<GoogleSearchResult.ResponseData.Cursor.Pages> pagers=googleSearchResult.getResponseData().getCursor().getPagers();
+                            curIndex++;
+                            if(pagers!=null&&curIndex<pagers.size()){
+                                isLoadingMore = true;
+                                refreshLayout.setRefreshing(true);
+                                new GoogleSearch(MainActivity.this,searchCallBack).execute(curKey,
+                                        googleSearchResult.getResponseData().getCursor().getPagers().get(curIndex).getStart());
+                                return;
+                            }else{
+                                isEnd = true;
+                                Toast.makeText(MainActivity.this,"至底",Toast.LENGTH_SHORT).show();
+                            }
+                        }else{
+                            isLoadingMore = false;
+                        }
                         refreshLayout.setRefreshing(false);
                     }
                 }
             }
         });
+
 
     }
 
@@ -149,6 +185,7 @@ public class MainActivity extends ActionBarActivity {
     String curKey = "";
     GoogleSearch googleSearch;
     public void queryKeyWorld(String keyworld){
+        keyworld = keyworld.replace(" ","_");
         if(!keyworld.isEmpty()&&!curKey.equals(keyworld)) {
             curKey = keyworld;
             recycleAdapter.reSet();
@@ -167,6 +204,7 @@ public class MainActivity extends ActionBarActivity {
                   public void run() {
                       recycleAdapter.setData(googleSearchResult.getResponseData().getResults());
                       refreshLayout.setRefreshing(false);
+                      isLoadingMore = false;
                   }
               });
 
@@ -175,6 +213,7 @@ public class MainActivity extends ActionBarActivity {
                   @Override
                   public void run() {
                       refreshLayout.setRefreshing(false);
+                      isLoadingMore = false;
                   }
               });
           }
@@ -196,15 +235,23 @@ public class MainActivity extends ActionBarActivity {
         List<GoogleSearchResult.ResponseData.Results> data;
 
         public void setData(List<GoogleSearchResult.ResponseData.Results> data) {
-            if(this.data==null)
-               this.data = data;
-            else
-                this.data.addAll(0,data);
-            notifyDataSetChanged();
+            if(this.data==null) {
+                this.data = data;
+                notifyDataSetChanged();
+            }
+            else {
+                int start = data.size();
+                this.data.addAll(data);
+                int end = data.size();
+                for(;start<end;start++) {
+                    notifyItemInserted(start);
+                }
+            }
+
         }
         public void reSet(){
             this.data = null;
-
+            isEnd = false;
             notifyDataSetChanged();
         }
         public RecycleAdapter(Context context) {
@@ -240,7 +287,7 @@ public class MainActivity extends ActionBarActivity {
                 public void onLoadingComplete(String imgUrl, View view, Bitmap bitmap) {
                     if (viewHolder.iv.getTag() != null
                             && viewHolder.iv.getTag().equals(imgUrl)){
-                        int width = recyclerView.getWidth() / 3;
+                        int width = recyclerView.getWidth() / rowCount;
                         int height = width * bitmap.getHeight() / bitmap.getWidth();
                         RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
                                 width, height);
