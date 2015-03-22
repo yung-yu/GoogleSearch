@@ -7,10 +7,8 @@
 ##實現
 ---
 ###利用GSON來取得Google SearchImage api回傳JSON解析和以RecyclerView實現瀑布流呈現結果。
+[測試影片](https://youtu.be/PBiXWbLiLt4)
 
-<iframe width="420" height="315"
-src="https://www.youtube.com/watch?v=PBiXWbLiLt4">
-</iframe>
 
 <br>
 
