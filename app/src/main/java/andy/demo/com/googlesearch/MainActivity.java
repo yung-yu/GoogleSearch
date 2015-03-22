@@ -2,6 +2,7 @@ package andy.demo.com.googlesearch;
 
 import android.content.Context;
 import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.support.v4.widget.SwipeRefreshLayout;
 import android.support.v7.app.ActionBarActivity;
 import android.os.Bundle;
@@ -142,12 +143,13 @@ public class MainActivity extends ActionBarActivity {
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.menu_main, menu);
           MenuItem searchItem = menu.findItem(R.id.action_search);
-          SearchView searchView = (SearchView) searchItem.getActionView();
+          final SearchView searchView = (SearchView) searchItem.getActionView();
         searchView.setQueryHint("請輸入查詢關鍵字");
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(String s) {
                 queryKeyWorld(s);
+                searchView.setQuery("",false);
                 return false;
             }
 
@@ -274,8 +276,10 @@ public class MainActivity extends ActionBarActivity {
         @Override
         public void onBindViewHolder(final ViewHolder viewHolder, int i) {
             GoogleSearchResult.ResponseData.Results item = getItem(i);
-            viewHolder.iv.setTag(item.getTbUrl());
-            imageLoader.displayImage(item.getTbUrl(),viewHolder.iv,new ImageLoadingListener() {
+
+            String url = item.getTbUrl();
+            viewHolder.iv.setTag(url);
+            imageLoader.displayImage(url,viewHolder.iv,new ImageLoadingListener() {
                 @Override
                 public void onLoadingStarted(String s, View view) {
                     viewHolder.cardView.setVisibility(View.INVISIBLE);
@@ -292,12 +296,16 @@ public class MainActivity extends ActionBarActivity {
                             && viewHolder.iv.getTag().equals(imgUrl)){
                         int width = recyclerView.getWidth() / rowCount;
                         int height = width * bitmap.getHeight() / bitmap.getWidth();
-                        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(
-                                width, height);
+                        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams) viewHolder.cardView.getLayoutParams();
+
+                        params.width = width;
+                        params.height = height;
+
                         viewHolder.cardView.setLayoutParams(params);
                         viewHolder.iv.setImageBitmap(bitmap);
                         viewHolder.cardView.startAnimation(AnimationUtils.loadAnimation(MainActivity.this,android.R.anim.fade_in));
                         viewHolder.cardView.setVisibility(View.VISIBLE);
+
 
                     }
                 }
@@ -339,7 +347,13 @@ public class MainActivity extends ActionBarActivity {
         @Override
         public void onViewRecycled(ViewHolder holder) {
             super.onViewRecycled(holder);
-
+//            if(holder.iv.getDrawable() instanceof BitmapDrawable){
+//                BitmapDrawable bd = (BitmapDrawable) holder.iv.getDrawable();
+//                if(bd.getBitmap()!=null){
+//                    if(!bd.getBitmap().isRecycled())
+//                        bd.getBitmap().recycle();
+//                }
+//            }
 
         }
 
