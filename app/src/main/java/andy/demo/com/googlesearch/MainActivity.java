@@ -17,6 +17,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.animation.AnimationUtils;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
@@ -85,13 +86,18 @@ public class MainActivity extends ActionBarActivity {
         recycleAdapter = new RecycleAdapter(this);
         recyclerView.setAdapter(recycleAdapter);
 
-        refreshLayout.setOnTouchListener(null);
+        refreshLayout.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
+            @Override
+            public void onRefresh() {
+                if(!isLoadingMore)
+                    refreshLayout.setRefreshing(false);
+            }
+        });
         recyclerView.setOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override
             public void onScrolled(RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
-                if(isEnd)
-                    return;
+
                 int[] lastVisibleItemArray = mStaggeredGridLayoutManager.findLastVisibleItemPositions(null);
                 int  lastVisibleItem = 0;
                 for (int i :lastVisibleItemArray){
@@ -119,9 +125,6 @@ public class MainActivity extends ActionBarActivity {
                                 new GoogleSearch(MainActivity.this,searchCallBack).execute(curKey,
                                         googleSearchResult.getResponseData().getCursor().getPagers().get(curIndex).getStart());
                                 return;
-                            }else{
-                                isEnd = true;
-                                Toast.makeText(MainActivity.this,"至底",Toast.LENGTH_SHORT).show();
                             }
                         }else{
                             isLoadingMore = false;
@@ -275,12 +278,12 @@ public class MainActivity extends ActionBarActivity {
             imageLoader.displayImage(item.getTbUrl(),viewHolder.iv,new ImageLoadingListener() {
                 @Override
                 public void onLoadingStarted(String s, View view) {
-                    viewHolder.iv.setImageResource(R.drawable.onlytrue);
+                    viewHolder.cardView.setVisibility(View.INVISIBLE);
                 }
 
                 @Override
                 public void onLoadingFailed(String s, View view, FailReason failReason) {
-
+                    viewHolder.iv.setImageResource(R.drawable.onlytrue);
                 }
 
                 @Override
@@ -293,6 +296,8 @@ public class MainActivity extends ActionBarActivity {
                                 width, height);
                         viewHolder.cardView.setLayoutParams(params);
                         viewHolder.iv.setImageBitmap(bitmap);
+                        viewHolder.cardView.startAnimation(AnimationUtils.loadAnimation(MainActivity.this,android.R.anim.fade_in));
+                        viewHolder.cardView.setVisibility(View.VISIBLE);
 
                     }
                 }
